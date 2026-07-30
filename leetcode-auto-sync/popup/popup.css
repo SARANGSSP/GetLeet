@@ -10,6 +10,47 @@ h1 {
   margin: 0 0 12px;
 }
 
+#statsCard {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat {
+  flex: 1;
+  text-align: center;
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 10px 6px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+#connectedInfo {
+  font-size: 12px;
+  color: #2ea44f;
+  background: #f0fbf4;
+  border: 1px solid #d3f0dd;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+}
+
+#connectedInfo.hidden {
+  display: none;
+}
+
 label {
   display: block;
   font-size: 12px;
@@ -65,14 +106,10 @@ button.primary:hover {
   background: #1a1e22;
 }
 
-#connectOAuth {
-  margin-top: 6px;
-}
-
 #oauthStatus {
   font-size: 11px;
   color: #555;
-  margin: 6px 0 0;
+  margin: 6px 0 14px;
 }
 
 .row {

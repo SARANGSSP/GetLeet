@@ -7,11 +7,40 @@
 <body>
   <h1>LeetCode Auto Sync</h1>
 
-  <div id="oauthSection">
-    <button id="connectOAuth" type="button" class="primary">Connect with GitHub</button>
-    <p id="oauthStatus"></p>
-    <details id="advancedOauth">
-      <summary>Self-hosting your own backend instead?</summary>
+  <div id="statsCard">
+    <div class="stat">
+      <div class="stat-value"><span id="streakValue">0</span> 🔥</div>
+      <div class="stat-label">Day Streak</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="solvedValue">0</div>
+      <div class="stat-label">Solved &amp; Synced</div>
+    </div>
+  </div>
+
+  <div id="connectedInfo" class="hidden"></div>
+
+  <button id="connectOAuth" type="button" class="primary">Connect with GitHub</button>
+  <p id="oauthStatus"></p>
+
+  <details id="advanced">
+    <summary>Advanced settings</summary>
+
+    <label>Repo name
+      <input type="text" id="repo" placeholder="leetcode-solutions" />
+    </label>
+
+    <label>Auto-organize by
+      <select id="organizeBy">
+        <option value="difficulty">Difficulty only (Easy/Medium/Hard)</option>
+        <option value="topic">Topic only (Array, DP, ...)</option>
+        <option value="difficulty-topic">Difficulty → Topic</option>
+        <option value="topic-difficulty">Topic → Difficulty</option>
+      </select>
+    </label>
+
+    <details>
+      <summary>Self-hosting your own OAuth backend?</summary>
       <label>GitHub OAuth App Client ID
         <input type="text" id="clientId" placeholder="Iv1.abc123..." />
       </label>
@@ -19,44 +48,23 @@
         <input type="text" id="backendUrl" placeholder="https://your-app.azurewebsites.net" />
       </label>
     </details>
-  </div>
 
-  <details id="patSection">
-    <summary>Or paste a Personal Access Token manually</summary>
-    <label>GitHub Personal Access Token
-      <input type="password" id="githubToken" placeholder="ghp_..." />
-    </label>
+    <details>
+      <summary>Or paste a Personal Access Token manually</summary>
+      <label>GitHub Personal Access Token
+        <input type="password" id="githubToken" placeholder="ghp_..." />
+      </label>
+      <label>Repo owner
+        <input type="text" id="owner" placeholder="your-username" />
+      </label>
+      <label>Branch
+        <input type="text" id="branch" placeholder="main" />
+      </label>
+    </details>
+
+    <button id="save">Save Settings</button>
+    <p id="status"></p>
   </details>
-
-  <div class="row">
-    <label>Repo owner
-      <input type="text" id="owner" placeholder="your-username" />
-    </label>
-    <label>Repo name
-      <input type="text" id="repo" placeholder="leetcode-solutions" />
-    </label>
-  </div>
-
-  <label>Branch
-    <input type="text" id="branch" placeholder="main" />
-  </label>
-
-  <label>Auto-organize by
-    <select id="organizeBy">
-      <option value="difficulty">Difficulty only (Easy/Medium/Hard)</option>
-      <option value="topic">Topic only (Array, DP, ...)</option>
-      <option value="difficulty-topic">Difficulty → Topic</option>
-      <option value="topic-difficulty">Topic → Difficulty</option>
-    </select>
-  </label>
-
-  <label class="checkbox">
-    <input type="checkbox" id="includeReadme" />
-    Add a README.md to each folder with problem info
-  </label>
-
-  <button id="save">Save Settings</button>
-  <p id="status"></p>
 
   <hr />
   <div id="lastSync">No syncs yet.</div>
