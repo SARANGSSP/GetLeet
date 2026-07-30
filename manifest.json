@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LeetCode Auto-Organizer Sync",
+  "name": "GetLeet",
   "version": "1.0.0",
   "description": "Automatically syncs your accepted LeetCode submissions to GitHub, sorted into folders by difficulty and/or topic — no manual folder picking.",
   "permissions": ["storage", "scripting", "identity"],
@@ -29,6 +29,6 @@
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "LeetCode Auto Sync"
+    "default_title": "GetLeet"
   }
 }

@@ -1,4 +1,4 @@
-// Minimal backend for the LeetCode Auto Sync extension's GitHub OAuth flow.
+// Minimal backend for the GetLeet extension's GitHub OAuth flow.
 //
 // The ONLY job of this server: take a temporary "code" from the extension,
 // exchange it with GitHub for an access token (which requires the client

@@ -1,4 +1,4 @@
-# LeetCode Auto-Organizer Sync
+# GetLeet
 
 > **License note:** This repository is public for transparency and
 > collaboration, but is **not** licensed for republishing to the Chrome

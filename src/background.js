@@ -25,7 +25,7 @@ const LANG_EXT = {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "SUBMISSION_ACCEPTED") {
     handleAcceptedSubmission(msg.submissionId, msg.titleSlug).catch((err) =>
-      console.error("[LeetCode Auto Sync] sync failed:", err)
+      console.error("[GetLeet] sync failed:", err)
     );
     return false;
   }
@@ -97,7 +97,7 @@ async function startGithubOAuth(clientId, backendUrl) {
 async function handleAcceptedSubmission(submissionId, titleSlug) {
   const settings = await getSettings();
   if (!settings.githubToken || !settings.owner || !settings.repo) {
-    console.warn("[LeetCode Auto Sync] Extension not configured yet — open the popup and add your GitHub details.");
+    console.warn("[GetLeet] Extension not configured yet — open the popup and add your GitHub details.");
     return;
   }
 
