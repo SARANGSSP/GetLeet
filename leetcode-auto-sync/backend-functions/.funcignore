@@ -1,9 +1,0 @@
-.git*
-.vscode
-local.settings.json
-local.settings.json.example
-test
-.venv
-__pycache__
-*.pyc
-node_modules/.bin

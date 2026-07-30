@@ -1,4 +1,5 @@
 const LC_GRAPHQL = "https://leetcode.com/graphql";
+const DEFAULT_REPO_NAME = "leetcode-solutions";
 
 const LANG_EXT = {
   python: "py",
@@ -48,7 +49,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 //    that URL is handed straight back to us in JS.
 // 2. We send that code to YOUR backend (which holds the client secret) to
 //    exchange it for a real access token.
-// 3. We store the token exactly like a manually-pasted PAT.
+// 3. Once we have the token, WE take it from here: look up the user's
+//    GitHub username and make sure a solutions repo exists (creating one
+//    if needed) so the person never has to type owner/repo/branch by hand.
 
 async function startGithubOAuth(clientId, backendUrl) {
   if (!clientId || !backendUrl) {
@@ -83,21 +86,74 @@ async function startGithubOAuth(clientId, backendUrl) {
   const { access_token } = await tokenRes.json();
   if (!access_token) throw new Error("Backend response missing access_token.");
 
+  // Figure out who the user is — no need to ask them.
+  const userRes = await fetch("https://api.github.com/user", {
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      Accept: "application/vnd.github+json",
+    },
+  });
+  if (!userRes.ok) throw new Error("Could not fetch GitHub username after connecting.");
+  const userData = await userRes.json();
+  const username = userData.login;
+
   const settings = await getSettings();
+  // Respect an explicit repo name if the person set one under Advanced,
+  // otherwise fall back to a sensible default and create it if missing.
+  const repoName = settings.repo || DEFAULT_REPO_NAME;
+  const { branch } = await ensureRepoExists(access_token, username, repoName);
+
   await chrome.storage.sync.set({
     ...settings,
     githubToken: access_token,
+    owner: username,
+    repo: repoName,
+    branch,
     clientId,
     backendUrl,
   });
 
-  return { username: null }; // could hit /user with the token if you want to show it
+  return { username, repo: repoName };
 }
+
+async function ensureRepoExists(token, owner, repoName) {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+  };
+
+  const existing = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, { headers });
+  if (existing.status === 200) {
+    const repoData = await existing.json();
+    return { branch: repoData.default_branch || "main" };
+  }
+
+  const created = await fetch("https://api.github.com/user/repos", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: repoName,
+      description: "My LeetCode solutions, auto-synced by GetLeet.",
+      private: false,
+      auto_init: true, // gives it a default branch immediately, so first commit doesn't need special-casing
+    }),
+  });
+
+  if (!created.ok) {
+    const errText = await created.text();
+    throw new Error(`Could not create GitHub repo "${repoName}": ${errText}`);
+  }
+
+  const repoData = await created.json();
+  return { branch: repoData.default_branch || "main" };
+}
+
+// ---------- Sync flow ----------
 
 async function handleAcceptedSubmission(submissionId, titleSlug) {
   const settings = await getSettings();
   if (!settings.githubToken || !settings.owner || !settings.repo) {
-    console.warn("[GetLeet] Extension not configured yet — open the popup and add your GitHub details.");
+    console.warn("[GetLeet] Extension not configured yet — open the popup and connect GitHub.");
     return;
   }
 
@@ -106,18 +162,26 @@ async function handleAcceptedSubmission(submissionId, titleSlug) {
     fetchQuestionMeta(titleSlug),
   ]);
 
+  // Every submission for the same problem always lands in the same
+  // per-problem folder, regardless of language or resubmission.
   const folderPath = buildFolderPath(question, settings.organizeBy);
   const ext = LANG_EXT[submission.langSlug?.toLowerCase()] || "txt";
-  const fileName = `${sanitize(question.title)}.${ext}`;
+  const fileName = `Solution.${ext}`;
   const fullPath = `${folderPath}/${fileName}`;
+  const readmePath = `${folderPath}/README.md`;
 
   const readme = buildReadme(question);
+  const commitMessage = buildCommitMessage(submission);
+
   await Promise.all([
-    commitFileToGithub(settings, fullPath, submission.code),
-    settings.includeReadme
-      ? commitFileToGithub(settings, `${folderPath}/README.md`, readme, true)
-      : Promise.resolve(),
+    commitFileToGithub(settings, fullPath, submission.code, { commitMessage }),
+    commitFileToGithub(settings, readmePath, readme, {
+      commitMessage: `Add README for ${question.title} - GetLeet`,
+      skipIfExists: true, // one README per problem, created once
+    }),
   ]);
+
+  await updateStats(question.titleSlug);
 
   chrome.storage.local.set({
     lastSync: { title: question.title, path: fullPath, time: Date.now() },
@@ -136,6 +200,10 @@ async function fetchSubmissionDetails(submissionId) {
       submissionDetails(submissionId: $submissionId) {
         code
         lang { name }
+        runtimeDisplay
+        runtimePercentile
+        memoryDisplay
+        memoryPercentile
         question { titleSlug }
       }
     }
@@ -145,6 +213,10 @@ async function fetchSubmissionDetails(submissionId) {
   return {
     code: details.code,
     langSlug: details.lang?.name,
+    runtimeDisplay: details.runtimeDisplay,
+    runtimePercentile: details.runtimePercentile,
+    memoryDisplay: details.memoryDisplay,
+    memoryPercentile: details.memoryPercentile,
   };
 }
 
@@ -155,6 +227,7 @@ async function fetchQuestionMeta(titleSlug) {
         title
         titleSlug
         difficulty
+        content
         topicTags { name slug }
       }
     }
@@ -176,35 +249,167 @@ async function lcGraphql(query, variables) {
   return json.data;
 }
 
-// ---------- Folder logic (the actual "auto" part) ----------
+// ---------- Folder / file naming ----------
 
 function buildFolderPath(question, organizeBy) {
   const difficulty = capitalize(question.difficulty || "Unknown");
   const primaryTopic = question.topicTags?.[0]?.name
     ? sanitize(question.topicTags[0].name)
     : "Uncategorized";
+  const questionFolder = sanitize(question.title);
 
+  let categoryPath;
   switch (organizeBy) {
     case "topic":
-      return primaryTopic;
+      categoryPath = primaryTopic;
+      break;
     case "topic-difficulty":
-      return `${primaryTopic}/${difficulty}`;
+      categoryPath = `${primaryTopic}/${difficulty}`;
+      break;
     case "difficulty-topic":
-      return `${difficulty}/${primaryTopic}`;
+      categoryPath = `${difficulty}/${primaryTopic}`;
+      break;
     case "difficulty":
     default:
-      return difficulty;
+      categoryPath = difficulty;
   }
+
+  // Every problem gets its own folder within the category path, so
+  // resubmissions (any language) always land in the same place.
+  return `${categoryPath}/${questionFolder}`;
+}
+
+function buildCommitMessage(submission) {
+  const time = submission.runtimeDisplay || "N/A";
+  const timePct =
+    typeof submission.runtimePercentile === "number" ? submission.runtimePercentile.toFixed(2) : "N/A";
+  const mem = submission.memoryDisplay || "N/A";
+  const memPct =
+    typeof submission.memoryPercentile === "number" ? submission.memoryPercentile.toFixed(2) : "N/A";
+  return `Time: ${time} (${timePct}%) | Memory: ${mem} (${memPct}%) - GetLeet`;
 }
 
 function buildReadme(question) {
-  const tags = (question.topicTags || []).map((t) => t.name).join(", ");
-  return `# ${question.title}\n\n**Difficulty:** ${question.difficulty}\n**Topics:** ${tags}\n\n[View on LeetCode](https://leetcode.com/problems/${question.titleSlug}/)\n`;
+  const difficulty = question.difficulty || "Unknown";
+  const badgeColor =
+    { easy: "brightgreen", medium: "yellow", hard: "red" }[difficulty.toLowerCase()] || "lightgrey";
+  const badge = `![Difficulty](https://img.shields.io/badge/Difficulty-${difficulty}-${badgeColor})`;
+  const topics = (question.topicTags || []).map((t) => t.name).join(", ") || "—";
+  const problemUrl = `https://leetcode.com/problems/${question.titleSlug}/`;
+  const description = htmlToMarkdown(question.content);
+
+  return `# [${question.title}](${problemUrl})
+
+${badge}
+
+**Topics:** ${topics}
+
+---
+
+${description}
+
+---
+
+*Synced automatically by **GetLeet** — inspired by [LeetSync](https://github.com/LeetSync/LeetSync), the original LeetCode → GitHub sync extension. 🙏*
+`;
+}
+
+// ---------- Minimal HTML -> Markdown for LeetCode's problem "content" field ----------
+
+function htmlToMarkdown(html) {
+  if (!html) return "_No problem description available._";
+  let md = html;
+
+  md = md.replace(/<br\s*\/?>/gi, "  \n");
+  md = md.replace(/<\/p>/gi, "\n\n");
+  md = md.replace(/<p[^>]*>/gi, "");
+
+  md = md.replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, (_, text) => `\n**${stripTags(text)}**\n`);
+
+  md = md.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_, code) => "\n```\n" + decodeEntities(stripTags(code)).trim() + "\n```\n");
+  md = md.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_, code) => "`" + decodeEntities(stripTags(code)) + "`");
+
+  md = md.replace(/<(b|strong)[^>]*>([\s\S]*?)<\/\1>/gi, "**$2**");
+  md = md.replace(/<(i|em)[^>]*>([\s\S]*?)<\/\1>/gi, "_$2_");
+  md = md.replace(/<sup[^>]*>([\s\S]*?)<\/sup>/gi, "^$1");
+
+  md = md.replace(/<ul[^>]*>/gi, "\n").replace(/<\/ul>/gi, "\n");
+  md = md.replace(/<ol[^>]*>/gi, "\n").replace(/<\/ol>/gi, "\n");
+  md = md.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, item) => `- ${decodeEntities(stripTags(item)).trim()}\n`);
+
+  md = stripTags(md);
+  md = decodeEntities(md);
+  md = md.replace(/\n{3,}/g, "\n\n").trim();
+
+  return md;
+}
+
+function stripTags(str) {
+  return str.replace(/<[^>]+>/g, "");
+}
+
+function decodeEntities(str) {
+  return str
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&rsquo;/g, "\u2019")
+    .replace(/&ldquo;/g, "\u201c")
+    .replace(/&rdquo;/g, "\u201d");
+}
+
+// ---------- Stats (streak + solved count) ----------
+
+function localDateKey(date = new Date()) {
+  // en-CA gives YYYY-MM-DD, in the browser's local timezone.
+  return date.toLocaleDateString("en-CA");
+}
+
+function computeStreak(syncDays) {
+  const daySet = new Set(syncDays);
+  let cursor = new Date();
+  // Grace period: if today hasn't been solved yet, start counting from
+  // yesterday so the streak doesn't drop to 0 before the day is over.
+  if (!daySet.has(localDateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let streak = 0;
+  while (daySet.has(localDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+async function updateStats(titleSlug) {
+  const { stats } = await chrome.storage.local.get({
+    stats: { solvedSlugs: [], syncDays: [] },
+  });
+
+  const solvedSet = new Set(stats.solvedSlugs);
+  solvedSet.add(titleSlug);
+
+  const daySet = new Set(stats.syncDays);
+  daySet.add(localDateKey());
+
+  const syncDays = Array.from(daySet);
+  const newStats = {
+    solvedSlugs: Array.from(solvedSet),
+    syncDays,
+    totalSolved: solvedSet.size,
+    streak: computeStreak(syncDays),
+  };
+
+  await chrome.storage.local.set({ stats: newStats });
 }
 
 // ---------- GitHub ----------
 
-async function commitFileToGithub(settings, path, content, skipIfExists = false, isRetry = false) {
+async function commitFileToGithub(settings, path, content, { commitMessage, skipIfExists = false } = {}, isRetry = false) {
   const apiBase = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${encodeURIComponent(
     path
   ).replace(/%2F/g, "/")}`;
@@ -220,11 +425,11 @@ async function commitFileToGithub(settings, path, content, skipIfExists = false,
   if (existing.status === 200) {
     const json = await existing.json();
     sha = json.sha;
-    if (skipIfExists) return; // e.g. don't overwrite an existing README each time
+    if (skipIfExists) return; // e.g. don't overwrite an existing per-problem README
   }
 
   const body = {
-    message: sha ? `Update ${path}` : `Add ${path}`,
+    message: commitMessage || (sha ? `Update ${path}` : `Add ${path}`),
     content: b64EncodeUnicode(content),
     branch: settings.branch || "main",
     ...(sha ? { sha } : {}),
@@ -239,7 +444,7 @@ async function commitFileToGithub(settings, path, content, skipIfExists = false,
   if (!res.ok) {
     if (res.status === 409 && !isRetry) {
       // The sha we fetched went stale between GET and PUT — refetch and retry once.
-      return commitFileToGithub(settings, path, content, skipIfExists, true);
+      return commitFileToGithub(settings, path, content, { commitMessage, skipIfExists }, true);
     }
     const errText = await res.text();
     throw new Error(`GitHub commit failed (${res.status}): ${errText}`);
@@ -269,7 +474,8 @@ function getSettings() {
         repo: "",
         branch: "main",
         organizeBy: "difficulty-topic",
-        includeReadme: true,
+        clientId: "",
+        backendUrl: "",
       },
       resolve
     );

@@ -5,16 +5,7 @@ const PUBLISHED_CLIENT_ID = "REPLACE_WITH_YOUR_GITHUB_OAUTH_CLIENT_ID";
 const PUBLISHED_BACKEND_URL = "https://leetsync-oauth-yourname456.azurewebsites.net";
 // -------------------------------------------------------------------
 
-const fields = [
-  "githubToken",
-  "owner",
-  "repo",
-  "branch",
-  "organizeBy",
-  "includeReadme",
-  "clientId",
-  "backendUrl",
-];
+const fields = ["githubToken", "owner", "repo", "branch", "organizeBy", "clientId", "backendUrl"];
 
 function load() {
   chrome.storage.sync.get(
@@ -24,16 +15,15 @@ function load() {
       repo: "",
       branch: "main",
       organizeBy: "difficulty-topic",
-      includeReadme: true,
       clientId: PUBLISHED_CLIENT_ID,
       backendUrl: PUBLISHED_BACKEND_URL,
     },
     (settings) => {
       for (const key of fields) {
         const el = document.getElementById(key);
-        if (el.type === "checkbox") el.checked = settings[key];
-        else el.value = settings[key];
+        el.value = settings[key];
       }
+      updateConnectedInfo(settings);
     }
   );
 
@@ -44,18 +34,38 @@ function load() {
       el.textContent = `Last synced: "${lastSync.title}" → ${lastSync.path} (${when})`;
     }
   });
+
+  loadStats();
+}
+
+function loadStats() {
+  chrome.storage.local.get({ stats: { totalSolved: 0, streak: 0 } }, ({ stats }) => {
+    document.getElementById("streakValue").textContent = stats.streak || 0;
+    document.getElementById("solvedValue").textContent = stats.totalSolved || 0;
+  });
+}
+
+function updateConnectedInfo(settings) {
+  const el = document.getElementById("connectedInfo");
+  if (settings.owner && settings.repo) {
+    el.textContent = `Connected as ${settings.owner} → ${settings.repo}`;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
 }
 
 function save() {
   const settings = {};
   for (const key of fields) {
     const el = document.getElementById(key);
-    settings[key] = el.type === "checkbox" ? el.checked : el.value.trim();
+    settings[key] = el.value.trim();
   }
   chrome.storage.sync.set(settings, () => {
     const status = document.getElementById("status");
     status.textContent = "Saved ✓";
     setTimeout(() => (status.textContent = ""), 1500);
+    updateConnectedInfo(settings);
   });
 }
 
@@ -65,28 +75,33 @@ function connectOAuth() {
   const statusEl = document.getElementById("oauthStatus");
 
   if (!clientId || clientId.startsWith("REPLACE_WITH") || !backendUrl) {
-    statusEl.textContent = "Not configured yet — expand 'Self-hosting' and fill in your own Client ID + backend URL, or wait for the developer to publish theirs.";
+    statusEl.textContent =
+      "Not configured yet — expand 'Advanced settings' and fill in your own Client ID + backend URL, or wait for the developer to publish theirs.";
     return;
   }
 
   statusEl.textContent = "Opening GitHub authorization…";
-  chrome.runtime.sendMessage(
-    { type: "START_GITHUB_OAUTH", clientId, backendUrl },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        statusEl.textContent = `Error: ${chrome.runtime.lastError.message}`;
-        return;
-      }
-      if (response?.ok) {
-        statusEl.textContent = "Connected ✓";
-        load(); // refresh fields, including the token now stored via OAuth
-      } else {
-        statusEl.textContent = `Failed: ${response?.error || "unknown error"}`;
-      }
+  chrome.runtime.sendMessage({ type: "START_GITHUB_OAUTH", clientId, backendUrl }, (response) => {
+    if (chrome.runtime.lastError) {
+      statusEl.textContent = `Error: ${chrome.runtime.lastError.message}`;
+      return;
     }
-  );
+    if (response?.ok) {
+      statusEl.textContent = `Connected as ${response.username} → ${response.repo} ✓`;
+      load(); // refresh everything, including the token + repo now set automatically
+    } else {
+      statusEl.textContent = `Failed: ${response?.error || "unknown error"}`;
+    }
+  });
 }
 
 document.getElementById("save").addEventListener("click", save);
 document.getElementById("connectOAuth").addEventListener("click", connectOAuth);
 document.addEventListener("DOMContentLoaded", load);
+
+// Keep stats fresh if a sync happens while the popup is open.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.stats) {
+    loadStats();
+  }
+});

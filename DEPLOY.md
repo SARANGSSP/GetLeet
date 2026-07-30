@@ -11,7 +11,10 @@ There are two backends included:
   unless you have a reason not to.
 
 Both expose the same route — `POST /api/github/token` — so the extension
-doesn't care which one you point it at.
+doesn't care which one you point it at. Everything downstream of the token
+exchange (finding the user's GitHub username, creating their solutions
+repo if it doesn't exist yet) now happens inside the extension itself, so
+the backend's job stays exactly this one endpoint.
 
 ---
 
@@ -103,9 +106,12 @@ curl https://$FUNCTION_APP.azurewebsites.net/api/health
 
 ### 5. Point the extension at it
 
-In the popup's OAuth section, set **Backend URL** to
+In the popup, expand **Advanced settings → Self-hosting your own OAuth
+backend?**, set **Your backend URL** to
 `https://<your-function-app>.azurewebsites.net` and **Client ID** to the
-value from step 1. Click Connect.
+value from step 1. Then click **Connect with GitHub** — the extension
+looks up your username and creates (or reuses) your solutions repo on its
+own from there.
 
 ### Cost reality check
 At personal-use volumes (a handful of OAuth connects, ever) this stays
@@ -160,13 +166,16 @@ In `manifest.json`, `host_permissions` already includes
 `https://*.azurewebsites.net/*`. If you're using a custom domain instead,
 add it there too.
 
-In the extension popup, expand **"Connect via GitHub OAuth"**, enter:
+In the extension popup, expand **Advanced settings → Self-hosting your own
+OAuth backend?**, enter:
 - **Client ID** — from step 1
 - **Backend URL** — e.g. `https://your-leetsync-oauth.azurewebsites.net`
 
 Click **Connect with GitHub**. A GitHub authorization popup opens, you
-approve, and the extension stores the resulting access token automatically
-— same as if you'd pasted a PAT, just without the manual copy/paste.
+approve, and the extension automatically finds your GitHub username,
+creates (or reuses) a `leetcode-solutions` repo, and stores the resulting
+access token — same as if you'd pasted a PAT, just without any manual
+copy/paste or repo/owner/branch typing.
 
 ## Security notes
 

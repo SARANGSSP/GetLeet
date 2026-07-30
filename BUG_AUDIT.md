@@ -79,7 +79,12 @@ or is still open.
     written from general knowledge of LeetCode's (undocumented, unversioned)
     GraphQL API, the same way #1 was wrong. Any future field rename (e.g.
     `topicTags` → something else) will fail silently or with an unhelpful
-    error. No schema validation or fallback exists.
+    error. No schema validation or fallback exists. **This now also covers
+    the new `runtimeDisplay` / `runtimePercentile` / `memoryDisplay` /
+    `memoryPercentile` / `content` fields added for commit-message stats
+    and README generation — these field names are a best-effort guess and
+    should be checked against a real DevTools → Network `/graphql` payload
+    if commit messages or READMEs come out with "N/A" or garbled text.**
 
 11. **Multi-topic problems only use the first tag**
     `buildFolderPath` always uses `topicTags[0]`. LeetCode doesn't
@@ -93,27 +98,49 @@ or is still open.
     map's keys, silently produces a `.txt` file instead of erroring or
     warning.
 
+13. **`htmlToMarkdown` is regex-based, not a real HTML parser**
+    (`src/background.js`) Service workers have no DOM/`DOMParser`, so the
+    problem-statement-to-Markdown conversion is done with a sequence of
+    regex substitutions. It handles LeetCode's typical tag set (`p`, `br`,
+    `pre`, `code`, `b`/`strong`, `i`/`em`, `sup`, `ul`/`ol`/`li`) but isn't
+    exhaustive — unusual nested markup or tags not in the list will fall
+    through the final tag-stripping pass as plain text rather than being
+    reformatted.
+
+14. **Streak/solved stats reset if `chrome.storage.local` is cleared**
+    (`updateStats`, `computeStreak`) Stats live only in
+    `chrome.storage.local` (device-local, not synced). Reinstalling the
+    extension or clearing extension storage resets the streak and solved
+    count to zero even though the GitHub repo history is untouched.
+
 ### UX / Reliability
 
-13. **No user-visible error surface**
+15. **No user-visible error surface**
     All sync failures currently only appear in the background service
     worker's console (`chrome://extensions` → Errors). A failed sync is
     silent from the popup's perspective — no badge, no notification, no
     "last sync failed" state. The popup only tracks `lastSync` on success.
 
-14. **No retry/backoff on transient network failures**
+16. **No retry/backoff on transient network failures**
     A single dropped request to LeetCode's GraphQL API or GitHub's API
     (browser offline for a moment, DNS blip) fails the whole sync
     permanently for that submission with no retry.
 
-15. **Extension ID instability for Web Store publishing**
+17. **Extension ID instability for Web Store publishing**
     Already flagged separately — dev extension ID ≠ published ID unless a
     stable `key` is set in `manifest.json` before packaging. Not yet
     implemented.
 
-16. **No tests**
+18. **No tests**
     Zero automated coverage — everything was verified manually against a
     live LeetCode account and live Azure resources during this session.
+
+19. **Repo auto-creation always defaults to public** (`ensureRepoExists`)
+    The one-click connect flow creates `leetcode-solutions` as a public
+    repo (`private: false`) if it doesn't already exist. Anyone who wants a
+    private repo needs to either create it themselves beforehand (the
+    extension will detect and reuse it) or the default should be revisited
+    before wider distribution.
 
 ## Not Bugs, But Worth Flagging
 

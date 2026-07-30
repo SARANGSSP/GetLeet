@@ -5,10 +5,17 @@
 > Web Store or any other extension marketplace without the author's
 > permission. See [LICENSE.md](./LICENSE.md).
 
-A Chrome extension that syncs your accepted LeetCode submissions to a GitHub
-repo automatically — no manually picking a folder for difficulty or topic
-like LeetSync requires. It reads the problem's difficulty and topic tags
-from LeetCode itself and commits the solution to the right folder for you.
+A Chrome extension that syncs your accepted LeetCode submissions to a
+GitHub repo automatically — one click to connect, then everything else
+(username, repo, folder structure) is handled for you. It reads the
+problem's difficulty and topic tags from LeetCode itself and commits the
+solution to the right folder for you.
+
+**Inspired by [LeetSync](https://github.com/LeetSync/LeetSync)** — the
+original LeetCode → GitHub auto-sync extension. This project reuses the
+same core idea (watch submissions, push to GitHub) with a different setup
+flow and folder/README layout. All credit for pioneering this workflow
+goes to the LeetSync team. 🙏
 
 ## How it works
 
@@ -18,10 +25,14 @@ from LeetCode itself and commits the solution to the right folder for you.
 2. That gets relayed (via `content-isolated.js`) to the background service
    worker.
 3. The background worker calls LeetCode's GraphQL API (`/graphql`) to get:
-   - the submitted code + language (`submissionDetails` query)
-   - the problem's difficulty + topic tags (`question` query)
-4. It builds a folder path based on your chosen organization mode and
-   commits the file to your GitHub repo via the GitHub Contents API.
+   - the submitted code, language, and runtime/memory stats
+     (`submissionDetails` query)
+   - the problem's difficulty, topic tags, and full description
+     (`question` query)
+4. It builds a folder path based on your chosen organization mode —
+   **one folder per problem** — and commits the solution file plus a
+   formatted `README.md` (created once per problem) to your GitHub repo
+   via the GitHub Contents API.
 
 ## Setup
 
@@ -30,31 +41,45 @@ from LeetCode itself and commits the solution to the right folder for you.
 2. Enable "Developer mode" (top right)
 3. Click "Load unpacked" and select this folder
 
-### 2. Create a GitHub token
-1. GitHub → Settings → Developer settings → Personal access tokens →
-   Fine-grained tokens (or classic, with `repo` scope)
-2. Grant it write access to the repo you want solutions pushed to
-3. Copy the token
+### 2. Connect GitHub
+Click the extension icon and hit **Connect with GitHub**. That's it —
+the extension:
+- opens a GitHub authorization popup (no token to copy/paste)
+- looks up your GitHub username automatically
+- creates a `leetcode-solutions` repo under your account if you don't
+  already have one (or reuses it if you do)
 
-### 3. Configure the extension
-Click the extension icon and fill in:
-- **GitHub token** — from step 2
-- **Repo owner / name** — e.g. `yourname` / `leetcode-solutions`
-- **Branch** — usually `main`
-- **Auto-organize by** — choose:
-  - Difficulty only → `Easy/`, `Medium/`, `Hard/`
-  - Topic only → `Array/`, `Dynamic-Programming/`, etc. (uses the first
-    topic tag LeetCode lists for the problem)
-  - Difficulty → Topic → `Medium/Dynamic-Programming/`
-  - Topic → Difficulty → `Dynamic-Programming/Medium/`
+No owner, repo, branch, or token fields to fill in for the default setup.
+If you want a different repo name or organization mode, they're available
+under **Advanced settings**, along with a manual Personal Access Token
+option and self-hosted OAuth backend fields for anyone who wants full
+control.
 
-Click **Save Settings**.
-
-### 4. Solve problems as usual
+### 3. Solve problems as usual
 You must be logged into leetcode.com in the same browser. Submit a
 problem, wait for "Accepted", and the extension pushes the code to your
 repo within a couple seconds. The badge on the extension icon flashes a
-green checkmark on success.
+green checkmark on success, and the popup's **streak** and **solved**
+counters update automatically.
+
+## Repo layout
+
+Every problem gets its own folder, so resubmissions (in any language)
+always land in the same place:
+
+```
+<Difficulty>/<Topic>/<Problem Title>/
+  ├── Solution.py          # or .java, .cpp, etc. — one file per language used
+  └── README.md            # created once: title, difficulty badge, topics,
+                            # full problem statement, examples, and constraints
+```
+
+Commit messages follow LeetSync's original convention (with GetLeet's own
+signature), e.g.:
+
+```
+Time: 0 ms (100.00%) | Memory: 19.2 MB (88.88%) - GetLeet
+```
 
 ## Notes / caveats
 
@@ -66,5 +91,10 @@ green checkmark on success.
 - Multi-tag problems: when a mode uses "topic," the extension currently
   uses the **first** topic tag LeetCode returns for that problem, since a
   problem can have several tags and only one is needed for a folder path.
-- The extension only requests host permissions for `leetcode.com` and
-  `api.github.com` — nothing else.
+- The problem description is converted from LeetCode's HTML to Markdown
+  with a lightweight built-in converter — most formatting (code blocks,
+  lists, bold/italic, examples, constraints) carries over cleanly, but it
+  isn't a full HTML parser, so unusual formatting may occasionally slip
+  through as raw text.
+- The extension only requests host permissions for `leetcode.com`,
+  `api.github.com`, and `github.com` — nothing else.
