@@ -1,4 +1,4 @@
-Copyright (c) 2026 [YOUR NAME / GITHUB USERNAME]
+Copyright (c) 2026 [SARANGSSP]
 
 Permission is hereby granted to any person obtaining a copy of this
 software and associated documentation files (the "Software") to view,
