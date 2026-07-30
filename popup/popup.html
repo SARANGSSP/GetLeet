@@ -19,6 +19,7 @@
   </div>
 
   <div id="connectedInfo" class="hidden"></div>
+  <div id="errorBanner" class="hidden"></div>
 
   <button id="connectOAuth" type="button" class="primary">Connect with GitHub</button>
   <p id="oauthStatus"></p>
@@ -28,6 +29,11 @@
 
     <label>Repo name
       <input type="text" id="repo" placeholder="leetcode-solutions" />
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" id="privateRepo" />
+      Make the repo private (only applies when it's first created)
     </label>
 
     <label>Auto-organize by

@@ -33,7 +33,37 @@ if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
   );
 }
 
-app.post("/api/github/token", async (req, res) => {
+// Trust the platform's reverse proxy (Azure App Service, etc.) so req.ip
+// reflects the real client address instead of the proxy's.
+app.set("trust proxy", true);
+
+// Minimal in-memory rate limiter: each exchange still requires a valid,
+// single-use GitHub "code", so this is a best-effort guard against casual
+// abuse rather than a hard security boundary. Resets if the process
+// restarts. See BUG_AUDIT.md #6.
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+const rateLimitBuckets = new Map();
+
+function rateLimit(req, res, next) {
+  const key = req.ip || "unknown";
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key) || { count: 0, windowStart: now };
+
+  if (now - bucket.windowStart > RATE_LIMIT_WINDOW_MS) {
+    bucket.count = 0;
+    bucket.windowStart = now;
+  }
+  bucket.count += 1;
+  rateLimitBuckets.set(key, bucket);
+
+  if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
+    return res.status(429).json({ error: "Too many requests, please slow down." });
+  }
+  next();
+}
+
+app.post("/api/github/token", rateLimit, async (req, res) => {
   const { code, redirectUri } = req.body || {};
   if (!code) {
     return res.status(400).json({ error: "Missing 'code' in request body" });

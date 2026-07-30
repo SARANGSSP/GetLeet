@@ -50,10 +50,13 @@ the extension:
   already have one (or reuses it if you do)
 
 No owner, repo, branch, or token fields to fill in for the default setup.
-If you want a different repo name or organization mode, they're available
-under **Advanced settings**, along with a manual Personal Access Token
-option and self-hosted OAuth backend fields for anyone who wants full
-control.
+If you want a different repo name, a private repo instead of public,
+or a different organization mode, they're available under **Advanced
+settings**, along with a manual Personal Access Token option and
+self-hosted OAuth backend fields for anyone who wants full control.
+
+If a sync ever fails, the extension icon shows a red "!" badge and the
+popup displays what went wrong — it won't fail silently.
 
 ### 3. Solve problems as usual
 You must be logged into leetcode.com in the same browser. Submit a
@@ -87,14 +90,30 @@ Time: 0 ms (100.00%) | Memory: 19.2 MB (88.88%) - GetLeet
   undocumented and can change without notice. If syncing stops working,
   open the LeetCode submission page, check DevTools → Network → look at
   the `/graphql` request bodies, and adjust the queries in
-  `src/background.js` to match.
+  `src/background.js` to match. The extension automatically falls back to
+  a reduced query if it detects a schema mismatch, so a field rename
+  degrades gracefully (e.g. losing runtime/memory stats) rather than
+  breaking the whole sync.
 - Multi-tag problems: when a mode uses "topic," the extension currently
   uses the **first** topic tag LeetCode returns for that problem, since a
   problem can have several tags and only one is needed for a folder path.
 - The problem description is converted from LeetCode's HTML to Markdown
   with a lightweight built-in converter — most formatting (code blocks,
-  lists, bold/italic, examples, constraints) carries over cleanly, but it
-  isn't a full HTML parser, so unusual formatting may occasionally slip
-  through as raw text.
+  lists, links, bold/italic, examples, constraints) carries over cleanly,
+  but it isn't a full HTML parser, so unusual formatting may occasionally
+  slip through as raw text.
 - The extension only requests host permissions for `leetcode.com`,
   `api.github.com`, and `github.com` — nothing else.
+- See `BUG_AUDIT.md` for a full list of known issues, what's been fixed vs.
+  mitigated, and what's still open. See `DEPLOY.md` for a checklist to run
+  through before submitting to the Chrome Web Store.
+
+## Running the tests
+
+The folder-naming, commit-message, HTML→Markdown, and streak-calculation
+logic is covered by plain Node unit tests (no build step, no extra
+dependencies):
+
+```bash
+node --test tests/
+```

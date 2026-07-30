@@ -17,6 +17,9 @@ backend-functions/.python_packages/
 .vscode/
 *.log
 
+# Chrome Web Store signing key — never commit this
+*.pem
+
 # Build/zip artifacts from manual deploys
 *.zip
 deploy.zip

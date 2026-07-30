@@ -51,6 +51,20 @@ h1 {
   display: none;
 }
 
+#errorBanner {
+  font-size: 11px;
+  color: #86181d;
+  background: #ffeef0;
+  border: 1px solid #f5c2c7;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+}
+
+#errorBanner.hidden {
+  display: none;
+}
+
 label {
   display: block;
   font-size: 12px;

@@ -186,3 +186,66 @@ copy/paste or repo/owner/branch typing.
   you know it, rather than leaving it as `*`.
 - The backend doesn't log or store the code or token — it's a pure
   pass-through exchange.
+- Both backend options now rate-limit `/api/github/token` (10
+  requests/minute per IP, in-memory, best-effort — see `BUG_AUDIT.md` #8).
+
+---
+
+## Before submitting to the Chrome Web Store
+
+A few things worth doing *before* you hit publish, since some of them are
+much harder to change after the fact:
+
+### 1. Pin a stable extension ID
+
+Chrome assigns a different extension ID to an unpacked dev load than the
+one it assigns after publishing — unless you pin it yourself with a `key`
+in `manifest.json`, generated from your own keypair:
+
+```bash
+openssl genrsa -out getleet-key.pem 2048
+openssl rsa -in getleet-key.pem -pubout -outform DER | openssl base64 -A
+```
+
+Paste the resulting base64 string into `manifest.json` as a top-level
+`"key"` field, and **keep `getleet-key.pem` private and out of git** (it's
+already covered by `.gitignore`'s `*.pem` — add it if you generate the
+file with a different name). This matters here specifically because the
+GitHub OAuth redirect URI (`https://<ext-id>.chromiumapp.org/`) is derived
+from the extension ID — if the ID changes after publishing, your GitHub
+OAuth App's callback URL (and anyone's already-configured backend) breaks.
+
+### 2. Lock down `ALLOWED_EXTENSION_ORIGIN`
+
+Once you have a stable ID from step 1, set it as the real value instead of
+`*` on whichever backend you deployed (see the `ALLOWED_EXTENSION_ORIGIN`
+steps above).
+
+### 3. Add extension icons
+
+`manifest.json` currently has no `icons` field, so Chrome shows a generic
+default icon both in `chrome://extensions` and in the Web Store listing.
+Add 16×16, 48×48, and 128×128 PNGs and reference them:
+
+```json
+"icons": {
+  "16": "icons/icon16.png",
+  "48": "icons/icon48.png",
+  "128": "icons/icon128.png"
+}
+```
+
+### 4. Write a privacy policy
+
+The Chrome Web Store requires a published privacy policy for any
+extension requesting the `identity` permission (which this one does, for
+the GitHub OAuth flow). It doesn't need to be complicated — a short page
+stating what data the extension touches (LeetCode submission content,
+GitHub repo access) and that nothing is sold or shared with third parties
+is generally sufficient. Link to it in the Web Store listing form.
+
+### 5. Double check the OAuth App's callback URL
+
+Once you have your final, stable extension ID (step 1), go back to your
+GitHub OAuth App settings and make sure the **Authorization callback
+URL** matches `https://<final-extension-id>.chromiumapp.org/` exactly.
