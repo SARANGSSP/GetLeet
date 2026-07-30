@@ -2,7 +2,13 @@
   "manifest_version": 3,
   "name": "GetLeet",
   "version": "1.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvDrqBk8xNdQTRlJXEi5Bo7v/zw36CCj7fI06Q86k9UEBF3j/ka/uGmyJBfUp+TCzFKvqAZhRfB8WTClL6dreoc54pDRm3zyRNi916J3+YxTBL7tOU32XtKhmrQnUeWXV9i0oDbVv6RZNyWpwMFAsGGJoqjK+PcSN0P1AeQGGrU8kAmiRmVpo7TaZPWEmA6sbxH4whJFORPuTOjttm8IqzdKzHnIFu0yeY57pme7FzUEnIWhjswDV8Gw4oPrnI2Dy/W940Fzr42+tE/XMT7rgzveN6ghnBvpUWVRfD5sCQ5uFadhPIzFlw2c6sO30m1NkZNhmMRl4AsZ51wnRRFJyywIDAQAB",
   "description": "Automatically syncs your accepted LeetCode submissions to GitHub, one folder per problem, with stats tracking. Inspired by LeetSync.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": ["storage", "scripting", "identity"],
   "host_permissions": [
     "https://leetcode.com/*",
@@ -29,6 +35,11 @@
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "GetLeet"
+    "default_title": "GetLeet",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   }
 }

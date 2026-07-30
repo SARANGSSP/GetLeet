@@ -1,7 +1,7 @@
 // ---- Fill these in once, before publishing to the Chrome Web Store ----
 // End users of the published extension never see or touch these — they're
 // baked in so "Connect with GitHub" just works out of the box.
-const PUBLISHED_CLIENT_ID = "REPLACE_WITH_YOUR_GITHUB_OAUTH_CLIENT_ID";
+const PUBLISHED_CLIENT_ID = "Ov23li2aMYnn2uhQfC4n";
 const PUBLISHED_BACKEND_URL = "https://leetsync-oauth-yourname456.azurewebsites.net";
 // -------------------------------------------------------------------
 
